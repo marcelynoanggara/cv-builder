@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="app-version" content="20261012j" />
+  <title>CV Builder — Interactive Resume Maker</title>
+  <meta name="description" content="Build a clean, beautiful CV in minutes. Interactive editor, live preview, templates, and PDF export. Free and open source." />
+  <meta name="theme-color" content="#4f46e5" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/icon-180.png" />
+  <link rel="stylesheet" href="styles.css?v=20261012j" />
+</head>
+<body>
+  <header class="app-header no-print">
+    <div class="brand">
+      <span class="brand-logo" aria-hidden="true">CV</span>
+      <span class="brand-name">CV Builder</span>
+    </div>
+    <div class="header-actions">
+      <button id="btnAbout" class="btn btn-icon" aria-label="About this app">ⓘ</button>
+      <button id="btnInstall" class="btn btn-ghost" hidden>Install app</button>
+      <button id="btnPdf" class="btn btn-primary">Export PDF</button>
+      <div class="menu-wrap">
+        <button id="btnMenu" class="btn btn-icon" aria-label="More actions" aria-haspopup="true">⋯</button>
+        <div id="menu" class="menu" hidden>
+          <button data-act="export-json">Download JSON</button>
+          <button data-act="import-json">Import JSON</button>
+          <button data-act="randomize">🎲 Randomize data</button>
+          <button data-act="load-sample">Load sample data</button>
+          <button data-act="clear" class="danger">Clear everything</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="view-toggle no-print" role="tablist" aria-label="View">
+    <button id="tabEdit" class="active" role="tab" aria-selected="true">Edit</button>
+    <button id="tabPreview" role="tab" aria-selected="false">Preview</button>
+  </div>
+
+  <main class="layout">
+    <section id="editor" class="editor no-print" aria-label="CV editor"></section>
+    <section id="previewPane" class="preview-pane" aria-label="CV preview">
+      <div class="paper-wrap">
+        <div id="preview" class="paper"></div>
+      </div>
+    </section>
+  </main>
+
+  <input type="file" id="fileImport" accept="application/json,.json" hidden />
+  <input type="file" id="photoInput" accept="image/*" hidden />
+  <input type="file" id="fontInput" accept=".ttf,.otf,.woff,.woff2" hidden />
+
+  <button id="bubblePreview" class="bubble-preview no-print" aria-label="Intip pratinjau CV">👁</button>
+  <div id="previewSheet" class="sheet no-print" hidden role="dialog" aria-modal="true" aria-label="Pratinjau CV">
+    <div class="sheet-card">
+      <div class="sheet-bar">
+        <strong>Pratinjau CV</strong>
+        <button id="sheetClose" class="btn btn-icon" aria-label="Tutup pratinjau">×</button>
+      </div>
+      <div class="paper-wrap"><div id="sheetPaper" class="paper"></div></div>
+    </div>
+  </div>
+
+  <div id="aboutModal" class="modal" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-label="About CV Builder">
+      <button id="aboutClose" class="modal-close" aria-label="Close">×</button>
+      <div class="about-hero">
+        <span class="brand-logo big" aria-hidden="true">CV</span>
+        <h2>CV Builder</h2>
+        <p class="ver">Version 1.2 · Open source (MIT License)</p>
+      </div>
+      <p class="about-desc">A free, open-source tool for building a professional CV in minutes. Design with total freedom, preview every change live, and export a polished PDF — no account required.</p>
+      <ul class="about-list">
+        <li>Interactive editor with live preview</li>
+        <li>5 professional templates, custom colors &amp; fonts</li>
+        <li>Reorder sections, toggle visibility, custom CSS</li>
+        <li>Optional profile photo</li>
+        <li>Random CV generator for inspiration</li>
+        <li>One-click PDF export &amp; JSON backup</li>
+        <li>Installable app, works offline</li>
+      </ul>
+      <a class="about-link" href="https://github.com/marcelynoanggara/cv-builder" target="_blank" rel="noopener">View source on GitHub ↗</a>
+      <p class="about-credit">Created by Marcelyno Anggara</p>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <div id="confirmModal" class="modal no-print" hidden>
+    <div class="modal-card confirm-card" role="alertdialog" aria-modal="true" aria-label="Confirmation">
+      <p id="confirmMsg" class="confirm-msg"></p>
+      <div class="confirm-actions">
+        <button id="confirmCancel" class="btn btn-ghost">Cancel</button>
+        <button id="confirmOk" class="btn btn-primary">Yes, continue</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js?v=20261012j"></script>
+  <div class="update-banner" id="updateBanner" hidden>
+    <span>Ada versi baru CV Builder 🎉</span>
+    <button type="button" id="reloadApp">Muat ulang</button>
+  </div>
+  <script>
+  /* Pemeriksa versi otomatis: beri tahu pengguna bila ada rilis baru di server.
+     Bekerja sama dengan service worker (navigasi & _vchk selalu network-first). */
+  (function () {
+    var banner = document.getElementById("updateBanner");
+    var current = (document.querySelector('meta[name="app-version"]') || {}).content || "";
+    function check() {
+      fetch(new URL("version.json?_vchk=" + Date.now(), location.href), { cache: "no-store" })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          var latest = (data && data.version) || "";
+          if (latest && current && latest !== current) { banner.hidden = false; banner.classList.add("show"); }
+        })
+        .catch(function () {});
+    }
+    document.getElementById("reloadApp").addEventListener("click", function () { location.reload(true); });
+    document.addEventListener("visibilitychange", function () { if (!document.hidden) check(); });
+    setInterval(check, 5 * 60 * 1000);
+    setTimeout(check, 15000);
+  })();
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').then((reg) => {
+          // Check for a new version every hour (for long-open sessions)
+          setInterval(() => reg.update().catch(() => {}), 60 * 60 * 1000);
+          // ...and every time the tab becomes visible again
+          document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) reg.update().catch(() => {});
+          });
+        }).catch(() => {});
+        // When a newer version takes over, tell the user and reload —
+        // no need to clear browsing data, the app updates itself.
+        const hadController = !!navigator.serviceWorker.controller;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (hadController) {
+            if (typeof toast === 'function') toast('Versi baru tersedia — memuat ulang…');
+            setTimeout(() => window.location.reload(), 1500);
+          }
+        });
+      });
+    }
+  </script>
+</body>
+</html>
