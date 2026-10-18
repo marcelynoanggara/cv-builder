@@ -46,6 +46,49 @@ const SECTION_DEFS = [
 ];
 const DEFAULT_ORDER = SECTION_DEFS.map((s) => s.id);
 
+/* Custom section titles: state.sectionTitles = { projects: 'Portofolio', ... } */
+function secTitleFor(d, id) {
+  const def = SECTION_DEFS.find((s) => s.id === id);
+  const custom = d && d.sectionTitles && d.sectionTitles[id];
+  if (custom && String(custom).trim()) return String(custom).trim();
+  return def ? def.label : id;
+}
+function secTitle(id) {
+  return secTitleFor(state, id);
+}
+
+/* ---------- rich text: **bold** *italic* `code`, "- " lines become bullets ---------- */
+function richInline(s) {
+  return esc(String(s))
+    .replace(/\*\*([^*<\n]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|[\s(>])\*([^*\n<>]+)\*/g, '$1<em>$2</em>')
+    .replace(/`([^`\n<>]+)`/g, '<code>$1</code>');
+}
+function rich(text) {
+  const lines = String(text || '').split('\n');
+  let html = '';
+  let inList = false;
+  for (const raw of lines) {
+    const m = raw.match(/^\s*[-*]\s+(.+)$/);
+    if (m) {
+      if (!inList) {
+        html += '<ul class="dots">';
+        inList = true;
+      }
+      html += `<li>${richInline(m[1])}</li>`;
+    } else {
+      if (inList) {
+        html += '</ul>';
+        inList = false;
+      }
+      const t = raw.trim();
+      if (t) html += `${richInline(t)}<br>`;
+    }
+  }
+  if (inList) html += '</ul>';
+  return html.replace(/(<br>)+$/, '');
+}
+
 /* ---------- random persona generator ---------- */
 const RND_FIRST = ['Ayu','Bima','Citra','Dimas','Eka','Fajar','Gita','Hendra','Intan','Joko','Kirana','Lukman','Maya','Nadia','Putri','Rizky','Sinta','Taufik','Wulan','Yoga','Dewi','Agus','Rina','Bagus','Sari','Andi','Nita','Reza','Lina'];
 const RND_LAST = ['Pratama','Saputra','Wijaya','Kusuma','Santoso','Nugroho','Ramadhan','Anggraini','Setiawan','Hidayat','Puspita','Gunawan','Maharani','Firmansyah','Lestari','Utama','Permata','Siregar','Halim','Wibowo'];
@@ -108,6 +151,7 @@ function randomState() {
     design: JSON.parse(JSON.stringify(state.design)),
     sectionOrder: [...state.sectionOrder],
     hidden: [...state.hidden],
+    sectionTitles: { ...(state.sectionTitles || {}) },
     personal: {
       name,
       title,
@@ -165,6 +209,7 @@ function sampleState() {
     design: { accent: '#4f46e5', font: 'sans', sidebar: 'left', headerAlign: 'left', customCss: '' },
     sectionOrder: [...DEFAULT_ORDER],
     hidden: [],
+    sectionTitles: {},
     personal: {
       name: 'Raka Pratama',
       title: 'Frontend Developer',
@@ -265,6 +310,7 @@ function migrateState(s) {
   s.sectionOrder = s.sectionOrder.filter((id) => DEFAULT_ORDER.includes(id));
   if (!Array.isArray(s.hidden)) s.hidden = [];
   s.hidden = s.hidden.filter((id) => DEFAULT_ORDER.includes(id));
+  if (!s.sectionTitles || typeof s.sectionTitles !== 'object') s.sectionTitles = {};
   return s;
 }
 function saveState() {
@@ -307,7 +353,8 @@ function field(label, name, value, opts = {}) {
     opts.multiline
       ? `<textarea data-f="${name}" placeholder="${esc(opts.ph || '')}">${esc(value)}</textarea>`
       : `<input type="${type}" data-f="${name}" value="${esc(value)}" placeholder="${esc(opts.ph || '')}" />`;
-  return `<div class="field"><label>${esc(label)}</label>${input}</div>`;
+  const hint = opts.hint ? `<small class="hint">${opts.hint}</small>` : '';
+  return `<div class="field"><label>${esc(label)}</label>${input}${hint}</div>`;
 }
 
 /* ---------- design presets (one-tap styles) ---------- */
@@ -377,16 +424,6 @@ function acc(id, num, title, bodyHtml) {
 }
 
 function renderEditor() {
-  // Sinkronkan status accordion dari DOM yang masih hidup SEBELUM rebuild,
-  // agar menu yang sedang dibuka tidak pernah ketutup sendiri
-  document.querySelectorAll('#editor details[data-acc]').forEach((d) => {
-    if (d.open) openAcc.add(d.dataset.acc);
-    else openAcc.delete(d.dataset.acc);
-  });
-  // simpan posisi scroll agar tidak lompat setelah innerHTML diganti
-  const scroller = document.querySelector('.editor');
-  const sst = scroller ? scroller.scrollTop : 0;
-  const wsy = window.scrollY;
   const p = state.personal;
   const expHtml = state.experience
     .map(
@@ -406,7 +443,7 @@ function renderEditor() {
       </div>
       <label class="check-row"><input type="checkbox" data-f="current" ${e.current ? 'checked' : ''} /> I currently work here</label>
       <div style="height:10px"></div>
-      ${field('Highlights (one per line)', 'description', e.description, { multiline: true, ph: 'What did you achieve?' })}
+      ${field('Highlights (one per line)', 'description', e.description, { multiline: true, ph: 'What did you achieve?', hint: '<b>**tebal**</b> <i>*miring*</i> <code>`kode`</code> — bisa dipakai di tiap baris' })}
     </div>`
     )
     .join('');
@@ -424,7 +461,7 @@ function renderEditor() {
         ${field('School', 'school', e.school, { ph: 'University name' })}
       </div>
       ${field('Year', 'year', e.year, { ph: '2024' })}
-      ${field('Details', 'details', e.details, { multiline: true, ph: 'Honors, relevant coursework…' })}
+      ${field('Details', 'details', e.details, { multiline: true, ph: 'Honors, relevant coursework…', hint: '<b>**tebal**</b> <i>*miring*</i> — awali baris dengan "- " untuk bullet' })}
     </div>`
     )
     .join('');
@@ -441,7 +478,7 @@ function renderEditor() {
         ${field('Project name', 'name', e.name, { ph: 'My cool app' })}
         ${field('Link', 'link', e.link, { ph: 'github.com/you/app' })}
       </div>
-      ${field('Description', 'description', e.description, { multiline: true, ph: 'What does it do?' })}
+      ${field('Description', 'description', e.description, { multiline: true, ph: 'What does it do?', hint: '<b>**tebal**</b> <i>*miring*</i> <code>`kode`</code> — awali baris dengan "- " untuk bullet' })}
     </div>`
     )
     .join('');
@@ -474,16 +511,26 @@ function renderEditor() {
   ).join('');
 
   const swatches = ACCENTS.map(
-    (a) => `<button class="swatch ${state.design.accent === a.hex ? 'active' : ''}" data-accent="${a.hex}" style="background:${a.hex}" aria-label="${a.id}" title="${a.id}"></button>`
+    (a) => `<button class="swatch ${state.design.accent === a.hex ? 'active' : ''}" data-accent="${a.hex}" style="background:${a.hex}" aria-label="${a.id}"></button>`
   ).join('');
-  const customActive = !ACCENTS.some((a) => a.hex === state.design.accent);
-  const swatchHtml = `${swatches}<button class="swatch swatch-custom ${customActive ? 'active' : ''}" data-custom-color aria-label="Warna bebas" title="Warna bebas">+</button><input type="color" class="colorwell-hidden" data-design="accent" value="${esc(state.design.accent)}" aria-hidden="true" tabindex="-1" />`;
 
   const fontBtns = FONTS.map(
     (f) => `<button class="${state.design.font === f.id ? 'active' : ''}" data-font="${f.id}">${f.name}</button>`
   ).join('') + `<button class="${state.design.font === 'custom' ? 'active' : ''}" data-font="custom" title="${esc(state.design.customFontName || 'Upload your own font')}">${state.design.customFontData ? esc(state.design.customFontName || 'Custom') : '+ Font'}</button>`;
 
-  const secRows = secRowsHtml();
+  const secRows = state.sectionOrder
+    .map((id, i) => {
+      const def = SECTION_DEFS.find((s) => s.id === id);
+      const off = state.hidden.includes(id);
+      const custom = (state.sectionTitles && state.sectionTitles[id]) || '';
+      return `<div class="sec-row">
+        <input class="sec-rename${off ? ' off' : ''}" data-sec-title="${id}" value="${esc(custom)}" placeholder="${esc(def.label)}" aria-label="Rename ${esc(def.label)} section" title="Rename section (empty = default)" />
+        <button class="mini-btn" data-sec-up="${i}" ${i === 0 ? 'disabled' : ''} aria-label="Move ${def.label} up">↑</button>
+        <button class="mini-btn" data-sec-down="${i}" ${i === state.sectionOrder.length - 1 ? 'disabled' : ''} aria-label="Move ${def.label} down">↓</button>
+        <button class="mini-btn wide" data-sec-toggle="${id}">${off ? 'Show' : 'Hide'}</button>
+      </div>`;
+    })
+    .join('');
 
   const presetHtml = PRESETS.map((pr) => {
     const isActive = activePreset() && activePreset().id === pr.id;
@@ -492,12 +539,12 @@ function renderEditor() {
 
   const designBody = `
       <div class="field"><label>Gaya cepat — satu ketuk jadi</label><div class="preset-row">${presetHtml}</div></div>
-      <details class="adv" data-acc="design-adv"${openAcc.has('design-adv') ? ' open' : ''}>
+      <details class="adv">
         <summary><span>Kustomisasi lanjutan</span><span class="adv-chev" aria-hidden="true">›</span></summary>
         <div class="adv-body">
       <div class="field"><label>Template</label><div class="tpl-row">${tplBtns}</div></div>
       <div class="field"><label>Accent color</label>
-        <div class="accent-row">${swatchHtml}</div>
+        <div class="accent-row">${swatches}<input type="color" class="colorwell" data-design="accent" value="${esc(state.design.accent)}" aria-label="Custom accent color" title="Custom color" /></div>
       </div>
       <div class="field"><label>Font</label><div class="seg-row">${fontBtns}</div></div>
       <div class="field"><label>Sidebar position (Modern template)</label>
@@ -545,7 +592,7 @@ function renderEditor() {
   `;
   const summaryBody = `
       <div data-kind="personal">
-        ${field('Professional summary', 'summary', p.summary, { multiline: true, ph: '2–3 sentences about you…' })}
+        ${field('Professional summary', 'summary', p.summary, { multiline: true, ph: '2–3 sentences about you…', hint: '<b>**tebal**</b> <i>*miring*</i> <code>`kode`</code>' })}
       </div>
   `;
   const expBody = `
@@ -573,17 +620,15 @@ function renderEditor() {
   `;
 
   $('#editor').innerHTML = [
-    acc('design', 1, 'Design & Layout', designBody),
-    acc('personal', 2, 'Personal Info', personalBody),
-    acc('summary', 3, 'Summary', summaryBody),
-    acc('experience', 4, 'Experience', expBody),
-    acc('education', 5, 'Education', eduBody),
-    acc('skills', 6, 'Skills', skillsBody),
-    acc('projects', 7, 'Projects', projBody),
-    acc('languages', 8, 'Languages', langBody),
+    acc('personal', 1, 'Personal Info', personalBody),
+    acc('summary', 2, secTitle('profile'), summaryBody),
+    acc('experience', 3, secTitle('experience'), expBody),
+    acc('education', 4, secTitle('education'), eduBody),
+    acc('skills', 5, secTitle('skills'), skillsBody),
+    acc('projects', 6, secTitle('projects'), projBody),
+    acc('languages', 7, secTitle('languages'), langBody),
+    acc('design', 8, 'Design & Layout', designBody),
   ].join('');
-  if (scroller) scroller.scrollTop = sst;
-  if (wsy) window.scrollTo(0, wsy);
 }
 
 /* ---------- preview templates ---------- */
@@ -598,7 +643,7 @@ function bullets(text) {
     .map((l) => l.trim())
     .filter(Boolean);
   if (!lines.length) return '';
-  return `<ul class="dots">${lines.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>`;
+  return `<ul class="dots">${lines.map((l) => `<li>${richInline(l)}</li>`).join('')}</ul>`;
 }
 function contactLine(p) {
   return [p.email, p.phone, p.location, p.website].filter(Boolean).map(esc).join(' &nbsp;•&nbsp; ');
@@ -626,7 +671,7 @@ function sectionMap(d) {
       (e) => `<div class="item">
         <div class="item-head"><span class="item-title">${esc(e.degree)}</span><span class="item-date">${esc(e.year)}</span></div>
         <div class="item-sub">${esc(e.school)}</div>
-        ${e.details ? `<div class="item-sub">${esc(e.details)}</div>` : ''}</div>`
+        ${e.details ? `<div class="item-sub">${rich(e.details)}</div>` : ''}</div>`
     )
     .join('');
   const proj = d.projects
@@ -634,7 +679,7 @@ function sectionMap(d) {
     .map(
       (e) => `<div class="item">
         <div class="item-head"><span class="item-title">${esc(e.name)}</span><span class="item-date">${esc(e.link)}</span></div>
-        ${e.description ? `<div class="item-sub">${esc(e.description)}</div>` : ''}</div>`
+        ${e.description ? `<div class="item-sub">${rich(e.description)}</div>` : ''}</div>`
     )
     .join('');
   const lang = d.languages
@@ -642,12 +687,12 @@ function sectionMap(d) {
     .map((e) => `<div class="item-sub">${esc(e.name)}${e.level ? ` — ${esc(e.level)}` : ''}</div>`)
     .join('');
   return {
-    profile: p.summary ? section('Summary', `<p class="summary">${esc(p.summary)}</p>`) : '',
-    experience: section('Experience', exp),
-    education: section('Education', edu),
-    skills: d.skills.length ? section('Skills', `<div class="skill-list">${esc(d.skills.join('  \u2022  '))}</div>`) : '',
-    projects: section('Projects', proj),
-    languages: section('Languages', lang),
+    profile: p.summary ? section(secTitleFor(d, 'profile'), `<p class="summary">${rich(p.summary)}</p>`) : '',
+    experience: section(secTitleFor(d, 'experience'), exp),
+    education: section(secTitleFor(d, 'education'), edu),
+    skills: d.skills.length ? section(secTitleFor(d, 'skills'), `<div class="skill-list">${esc(d.skills.join('  \u2022  '))}</div>`) : '',
+    projects: section(secTitleFor(d, 'projects'), proj),
+    languages: section(secTitleFor(d, 'languages'), lang),
   };
 }
 
@@ -740,104 +785,16 @@ function setCustomCss(css) {
   el.textContent = String(css || '').replace(/<\/style/gi, '<\\/style');
 }
 
-function buildCvHtml() {
+function renderPreview() {
   const t = state.template;
-  return t === 'modern' ? tplModern(state)
+  const html =
+    t === 'modern' ? tplModern(state)
     : t === 'elegant' ? tplElegant(state)
     : t === 'executive' ? tplExecutive(state)
     : t === 'bold' ? tplBold(state)
     : tplMinimal(state);
-}
-
-function renderPreview() {
-  const html = buildCvHtml();
   $('#preview').innerHTML = html;
   setCustomCss(state.design.customCss);
-  const sheet = document.getElementById('previewSheet');
-  if (sheet && !sheet.hidden) {
-    document.getElementById('sheetPaper').innerHTML = html;
-  }
-  fitPaper();
-}
-
-/* ---------- samakan preview mobile = desktop ----------
-   Kecilkan kertas A4 secara proporsional bila wadahnya lebih sempit,
-   sehingga preview di HP = layout desktop = hasil print. */
-function fitPaperIn(wrap, paper) {
-  if (!wrap || !paper) return;
-  paper.style.transform = '';
-  wrap.classList.remove('fit');
-  wrap.style.height = '';
-  const avail = wrap.clientWidth;
-  const full = paper.offsetWidth; // 210mm
-  if (full > avail && avail > 0) {
-    const s = avail / full;
-    wrap.classList.add('fit');
-    paper.style.transform = 'scale(' + s + ')';
-    wrap.style.height = (paper.offsetHeight * s) + 'px';
-  }
-}
-function fitPaper() {
-  fitPaperIn(
-    document.querySelector('#previewPane .paper-wrap'),
-    document.getElementById('preview')
-  );
-  const sheet = document.getElementById('previewSheet');
-  if (sheet && !sheet.hidden) {
-    fitPaperIn(sheet.querySelector('.paper-wrap'), document.getElementById('sheetPaper'));
-  }
-}
-window.addEventListener('resize', fitPaper);
-window.addEventListener('orientationchange', () => setTimeout(fitPaper, 300));
-
-/* ---------- sinkron highlight swatch tanpa rebuild editor ---------- */
-function syncSwatchUI() {
-  const cur = state.design.accent;
-  const isCustom = !ACCENTS.some((a) => a.hex === cur);
-  document.querySelectorAll('#editor [data-accent]').forEach((b) =>
-    b.classList.toggle('active', b.dataset.accent === cur));
-  const cb = document.querySelector('#editor [data-custom-color]');
-  if (cb) cb.classList.toggle('active', isCustom);
-  const cw = document.querySelector('#editor [data-design="accent"]');
-  if (cw) cw.value = cur;
-}
-
-/* ---------- bangun ulang daftar section + refresh seluruh UI Design ----------
-   tanpa me-rebuild editor (menu tidak ketutup, scroll tidak lompat) */
-function secRowsHtml() {
-  return state.sectionOrder
-    .map((id, i) => {
-      const def = SECTION_DEFS.find((s) => s.id === id);
-      const off = state.hidden.includes(id);
-      return `<div class="sec-row">
-        <span class="lbl ${off ? 'off' : ''}">${def.label}</span>
-        <button class="mini-btn" data-sec-up="${i}" ${i === 0 ? 'disabled' : ''} aria-label="Move ${def.label} up">↑</button>
-        <button class="mini-btn" data-sec-down="${i}" ${i === state.sectionOrder.length - 1 ? 'disabled' : ''} aria-label="Move ${def.label} down">↓</button>
-        <button class="mini-btn wide" data-sec-toggle="${id}">${off ? 'Show' : 'Hide'}</button>
-      </div>`;
-    })
-    .join('');
-}
-
-function refreshDesignUI() {
-  const ed = document.getElementById('editor');
-  if (!ed) return;
-  const ap = typeof activePreset === 'function' ? activePreset() : null;
-  ed.querySelectorAll('[data-preset]').forEach((b) =>
-    b.classList.toggle('active', !!ap && b.dataset.preset === ap.id));
-  ed.querySelectorAll('[data-tpl]').forEach((b) =>
-    b.classList.toggle('active', b.dataset.tpl === state.template));
-  ed.querySelectorAll('[data-font]').forEach((b) =>
-    b.classList.toggle('active', b.dataset.font === state.design.font));
-  ed.querySelectorAll('[data-sidebar]').forEach((b) =>
-    b.classList.toggle('active', b.dataset.sidebar === state.design.sidebar));
-  ed.querySelectorAll('[data-align]').forEach((b) =>
-    b.classList.toggle('active', b.dataset.align === state.design.headerAlign));
-  syncSwatchUI();
-  const sub = ed.querySelector('[data-acc="design"] .acc-sub');
-  if (sub) sub.textContent = secSummary('design');
-  const secList = ed.querySelector('.sec-list');
-  if (secList) secList.innerHTML = secRowsHtml();
 }
 
 /* ---------- view toggle (mobile) ---------- */
@@ -849,29 +806,7 @@ function setView(showPreview) {
   $('#tabPreview').classList.toggle('active', showPreview);
   $('#tabEdit').setAttribute('aria-selected', String(!showPreview));
   $('#tabPreview').setAttribute('aria-selected', String(showPreview));
-  if (showPreview) requestAnimationFrame(fitPaper);
 }
-
-/* ---------- bubble preview: intip CV tanpa pindah tab ---------- */
-$('#bubblePreview').addEventListener('click', () => {
-  document.getElementById('sheetPaper').innerHTML = buildCvHtml();
-  const sheet = document.getElementById('previewSheet');
-  sheet.hidden = false;
-  sheet.querySelector('.sheet-card').scrollTop = 0;
-  document.body.style.overflow = 'hidden';
-  requestAnimationFrame(fitPaper);
-});
-function closeSheet() {
-  document.getElementById('previewSheet').hidden = true;
-  document.body.style.overflow = '';
-}
-$('#sheetClose').addEventListener('click', closeSheet);
-$('#previewSheet').addEventListener('click', (e) => {
-  if (e.target === document.getElementById('previewSheet')) closeSheet();
-});
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !document.getElementById('previewSheet').hidden) closeSheet();
-});
 
 function renderAll() {
   renderEditor();
@@ -895,6 +830,12 @@ $('#editor').addEventListener('input', (ev) => {
     renderPreview();
     return;
   }
+  if (t.dataset.secTitle) {
+    state.sectionTitles[t.dataset.secTitle] = t.value;
+    saveState();
+    renderPreview();
+    return;
+  }
   const f = t.dataset.f;
   if (!f) return;
   const entry = findEntry(t);
@@ -911,6 +852,10 @@ $('#editor').addEventListener('input', (ev) => {
 
 $('#editor').addEventListener('change', (ev) => {
   const t = ev.target;
+  if (t.dataset.secTitle) {
+    renderEditor(); // refresh accordion titles after rename
+    return;
+  }
   if (t.dataset.f === 'current' && t.type === 'checkbox') {
     const entry = findEntry(t);
     const item = state[entry.kind].find((x) => x.id === entry.id);
@@ -922,8 +867,7 @@ $('#editor').addEventListener('change', (ev) => {
     }
   }
   if (t.dataset.design === 'accent') {
-    // input handler sudah update state + preview; di sini cukup sync highlight swatch
-    syncSwatchUI();
+    renderAll(); // sync swatch highlight after color picker closes
   }
 });
 
@@ -939,8 +883,7 @@ $('#editor').addEventListener('click', (ev) => {
       state.design.font = pr.font;
       document.documentElement.style.setProperty('--accent', pr.accent);
       saveState();
-      refreshDesignUI();
-      renderPreview();
+      renderAll();
       toast(`Gaya "${pr.name}" diterapkan ✨`);
     }
     return;
@@ -973,8 +916,7 @@ $('#editor').addEventListener('click', (ev) => {
   if (tplBtn) {
     state.template = tplBtn.dataset.tpl;
     saveState();
-    refreshDesignUI();
-    renderPreview();
+    renderAll();
     return;
   }
 
@@ -983,16 +925,7 @@ $('#editor').addEventListener('click', (ev) => {
     state.design.accent = sw.dataset.accent;
     document.documentElement.style.setProperty('--accent', state.design.accent);
     saveState();
-    // Update highlight tanpa rebuild editor agar scroll tidak lompat
-    syncSwatchUI();
-    renderPreview();
-    return;
-  }
-
-  const customBtn = t.closest('[data-custom-color]');
-  if (customBtn) {
-    const picker = customBtn.parentElement.querySelector('[data-design="accent"]');
-    if (picker) picker.click();
+    renderAll();
     return;
   }
 
@@ -1004,8 +937,7 @@ $('#editor').addEventListener('click', (ev) => {
     }
     state.design.font = fontBtn.dataset.font;
     saveState();
-    refreshDesignUI();
-    renderPreview();
+    renderAll();
     return;
   }
 
@@ -1025,8 +957,7 @@ $('#editor').addEventListener('click', (ev) => {
   if (sbBtn) {
     state.design.sidebar = sbBtn.dataset.sidebar;
     saveState();
-    refreshDesignUI();
-    renderPreview();
+    renderAll();
     return;
   }
 
@@ -1034,8 +965,7 @@ $('#editor').addEventListener('click', (ev) => {
   if (alBtn) {
     state.design.headerAlign = alBtn.dataset.align;
     saveState();
-    refreshDesignUI();
-    renderPreview();
+    renderAll();
     return;
   }
 
@@ -1045,8 +975,7 @@ $('#editor').addEventListener('click', (ev) => {
     if (i > 0) {
       [state.sectionOrder[i - 1], state.sectionOrder[i]] = [state.sectionOrder[i], state.sectionOrder[i - 1]];
       saveState();
-      refreshDesignUI();
-      renderPreview();
+      renderAll();
     }
     return;
   }
@@ -1057,8 +986,7 @@ $('#editor').addEventListener('click', (ev) => {
     if (i < state.sectionOrder.length - 1) {
       [state.sectionOrder[i + 1], state.sectionOrder[i]] = [state.sectionOrder[i], state.sectionOrder[i + 1]];
       saveState();
-      refreshDesignUI();
-      renderPreview();
+      renderAll();
     }
     return;
   }
@@ -1070,8 +998,7 @@ $('#editor').addEventListener('click', (ev) => {
     if (ix >= 0) state.hidden.splice(ix, 1);
     else state.hidden.push(id);
     saveState();
-    refreshDesignUI();
-    renderPreview();
+    renderAll();
     return;
   }
 
@@ -1113,9 +1040,7 @@ $('#editor').addEventListener(
   'toggle',
   (ev) => {
     const d = ev.target.closest && ev.target.closest('details[data-acc]');
-    // Abaikan event dari elemen yang sedang dihapus (saat rebuild editor):
-    // itu event liar, bukan aksi user
-    if (!d || !d.isConnected) return;
+    if (!d) return;
     if (d.open) openAcc.add(d.dataset.acc);
     else openAcc.delete(d.dataset.acc);
   },
