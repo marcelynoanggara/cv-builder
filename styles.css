@@ -85,7 +85,7 @@ body {
 .menu button:hover { background: var(--bg); }
 .menu button.danger { color: #dc2626; }
 
-/* ---------- view toggle (mobile) ---------- */
+/* ---------- view toggle (mobile): dikunci agar ikut saat scroll ---------- */
 .view-toggle {
   display: flex;
   gap: 4px;
@@ -94,6 +94,9 @@ body {
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: 12px;
+  position: sticky;
+  top: 54px; /* tepat di bawah header yang sticky */
+  z-index: 40;
 }
 .view-toggle button {
   flex: 1;
@@ -303,20 +306,17 @@ body.show-preview .preview-pane { display: block; }
 .mini-elegant { background: linear-gradient(#fff 40%, #faf7f0 40%); }
 .mini-executive { background: linear-gradient(#1f2937 22%, #fff 22%); }
 .mini-bold { background: linear-gradient(135deg, #4f46e5 45%, #fff 45%); }
-.accent-row { display: flex; gap: 10px; margin-top: 12px; }
-.swatch {
-  width: 38px; height: 38px; border-radius: 50%;
-  border: 3px solid transparent;
-  cursor: pointer;
-  padding: 0;
-}
-.swatch.active { border-color: #fff; box-shadow: 0 0 0 2px var(--ink); }
+/* (definisi accent-row & swatch yang baru ada di bawah, dekat .colorwell-hidden) */
 
-/* ---------- preview / paper ---------- */
-.preview-pane { }
+/* ---------- preview / paper ----------
+   Kertas preview selebar A4 beneran (satuan mm = sama di layar & print),
+   jadi yang terlihat = yang tercetak (WYSIWYG). */
+.paper-wrap { overflow-x: auto; }
 .paper {
-  width: 100%;
-  max-width: 820px;
+  width: 210mm;
+  min-width: 210mm;
+  min-height: 297mm; /* samakan dengan tinggi halaman A4 di hasil print */
+  margin: 0 auto;
   background: #fff;
   border-radius: 6px;
   box-shadow: var(--shadow);
@@ -325,8 +325,8 @@ body.show-preview .preview-pane { display: block; }
   font-size: 14px;
 }
 
-/* template: shared bits */
-.cv { padding: 34px 36px; color: #1f2937; }
+/* template: shared bits — padding 12mm = margin kertas, sama di layar & print */
+.cv { padding: 12mm; color: #1f2937; }
 .cv h1 { margin: 0; font-size: 30px; line-height: 1.15; letter-spacing: -0.01em; }
 .cv .role { font-size: 15px; font-weight: 600; margin-top: 4px; }
 .cv .contact { font-size: 12.5px; color: #6b7280; margin-top: 10px; display: flex; flex-wrap: wrap; gap: 4px 14px; }
@@ -398,10 +398,7 @@ body.show-preview .preview-pane { display: block; }
 .cv-bold .band .role { color: rgba(255, 255, 255, 0.9); }
 .cv-bold .band .contact { color: rgba(255, 255, 255, 0.85); }
 .cv-bold .band-body { padding: 26px 36px 34px; }
-@media (max-width: 640px) {
-  .cv-bold .band { padding: 24px 20px 20px; }
-  .cv-bold .band-body { padding: 20px 20px 26px; }
-}
+/* (padding band disamakan mobile/desktop agar preview = print) */
 
 /* header with optional photo */
 .cv-head { display: flex; gap: 18px; align-items: center; }
@@ -414,10 +411,7 @@ body.show-preview .preview-pane { display: block; }
 }
 .cv-modern .cv-photo { border-color: rgba(255, 255, 255, 0.7); }
 .cv-hcenter .cv-head { flex-direction: column; text-align: center; }
-@media (max-width: 640px) {
-  .cv-photo { width: 72px; height: 72px; }
-  .cv-head { gap: 14px; }
-}
+/* (ukuran foto & gap disamakan mobile/desktop agar preview = print) */
 
 /* photo upload row in editor */
 .photo-row { display: flex; align-items: center; gap: 12px; }
@@ -450,14 +444,35 @@ body.show-preview .preview-pane { display: block; }
   cursor: pointer;
 }
 .seg-row button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
-.colorwell {
-  width: 46px; height: 40px;
-  padding: 3px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: #fff;
-  cursor: pointer;
+.colorwell-hidden {
+  position: absolute; width: 1px; height: 1px;
+  opacity: 0; pointer-events: none;
 }
+/* ---------- pemilih warna aksen: lingkaran besar + centang ---------- */
+.accent-row { display: flex; gap: 12px; margin-top: 12px; align-items: center; flex-wrap: wrap; position: relative; }
+.swatch {
+  width: 52px; height: 52px; border-radius: 50%;
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 1px var(--line), 0 3px 8px rgba(0,0,0,.12);
+  cursor: pointer; padding: 0; position: relative;
+  transition: transform .12s ease;
+}
+.swatch:active { transform: scale(.92); }
+.swatch.active { box-shadow: 0 0 0 2.5px var(--accent), 0 4px 12px rgba(0,0,0,.18); }
+.swatch.active::after {
+  content: '✓';
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+  color: #fff; font-size: 22px; font-weight: 800;
+  text-shadow: 0 1px 3px rgba(0,0,0,.5);
+}
+.swatch-custom {
+  background: conic-gradient(#f43f5e, #f59e0b, #84cc16, #06b6d4, #8b5cf6, #f43f5e);
+  color: #fff; font-size: 24px; font-weight: 700; line-height: 1;
+  display: grid; place-items: center;
+  text-shadow: 0 1px 3px rgba(0,0,0,.5);
+}
+.swatch-custom.active::after { content: ''; display: none; }
 .sec-list { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
 .sec-row {
   display: flex; align-items: center; gap: 6px;
@@ -466,18 +481,8 @@ body.show-preview .preview-pane { display: block; }
   background: #fff;
 }
 .sec-row:last-child { border-bottom: 0; }
-.sec-row .sec-rename {
-  flex: 1; min-width: 0;
-  font-size: 14px; font-weight: 600;
-  border: 1px solid transparent; border-radius: 8px;
-  padding: 5px 8px; margin: -5px -8px;
-  background: transparent; color: var(--ink);
-}
-.sec-row .sec-rename:hover { border-color: var(--line); }
-.sec-row .sec-rename:focus { border-color: var(--accent); background: #fff; outline: none; }
-.sec-row .sec-rename.off { color: var(--muted); }
-.sec-row .sec-rename::placeholder { color: var(--ink); opacity: 1; }
-.sec-row .sec-rename.off::placeholder { color: var(--muted); text-decoration: line-through; }
+.sec-row .lbl { flex: 1; font-size: 14px; font-weight: 600; }
+.sec-row .lbl.off { color: var(--muted); text-decoration: line-through; }
 .mini-btn {
   border: 1px solid var(--line);
   background: #fff;
@@ -492,12 +497,6 @@ body.show-preview .preview-pane { display: block; }
 textarea.mono, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .field textarea.mono { font-size: 13px; min-height: 110px; }
 .hint { font-size: 12.5px; color: var(--muted); margin: 6px 0 0; }
-small.hint { display: block; }
-#preview code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.88em; background: rgba(127,127,127,.14);
-  border-radius: 4px; padding: 1px 5px;
-}
 
 /* ---------- cv design variants ---------- */
 .cv-ff-serif { font-family: Georgia, "Times New Roman", serif; }
@@ -580,38 +579,84 @@ small.hint { display: block; }
   .editor { position: sticky; top: 76px; max-height: calc(100vh - 96px); overflow-y: auto; padding-right: 4px; }
 }
 
-/* ---------- small screens: un-squish everything ---------- */
+/* ---------- small screens: app chrome saja yang dirapatkan.
+   Layout ISI cv (.cv-*) TIDAK diubah di mobile agar preview = hasil print. */
 @media (max-width: 640px) {
   .app-header { padding: 8px 10px; }
+  .view-toggle { top: 50px; margin: 8px 10px 0; }
   .brand-name { font-size: 15px; }
   .btn { padding: 7px 11px; font-size: 13px; }
   .layout { padding: 10px; }
   .card { padding: 14px; }
-  .cv { padding: 22px 20px; }
-  .cv h1 { font-size: 24px; }
-  .cv .contact { font-size: 12px; }
-  /* modern template: stack sidebar on top instead of a squished column */
-  .cv-modern, .cv-modern.side-right { grid-template-columns: 1fr; }
-  .cv-modern.side-right .side { order: 0; }
-  .cv-modern .side { padding: 22px 20px; }
-  .cv-modern .main { padding: 22px 20px; }
-  .cv .item-head { flex-direction: column; align-items: flex-start; gap: 2px; }
   .tpl-row { grid-template-columns: repeat(2, 1fr); }
 }
 
-/* ---------- print: only the CV ---------- */
+/* ---------- print: only the CV ----------
+   Layout print dibuat IDENTIK dengan preview (WYSIWYG):
+   margin kertas datang dari padding .cv (12mm), bukan @page. */
 @media print {
   .no-print { display: none !important; }
+  .update-banner, .toast { display: none !important; } /* jangan ikut ke-print */
   body { background: #fff; }
   .layout { display: block; padding: 0; margin: 0; max-width: none; }
   .preview-pane { display: block !important; }
   .preview-pane { margin-top: 0; }
-  .paper-wrap { display: block; }
+  .paper-wrap { display: block; overflow: visible; }
   .paper {
     box-shadow: none; border: 0; border-radius: 0;
-    max-width: none; width: 100%;
+    width: 210mm; min-width: 0; margin: 0;
   }
-  .cv { padding: 0; font-size: 12px; }
-  .cv-modern .side { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  @page { size: A4; margin: 12mm; }
+  .cv-modern .side, .cv-bold .band { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  @page { size: A4; margin: 0; }
+}
+
+/* ---------- banner update versi ---------- */.update-banner{position:fixed;left:50%;transform:translateX(-50%) translateY(120%);bottom:18px;z-index:60;display:flex;align-items:center;gap:12px;background:#4f46e5;color:#fff;border-radius:16px;padding:12px 16px;box-shadow:0 18px 45px rgba(79,70,229,.35);transition:transform .3s ease;max-width:calc(100% - 32px)}
+.update-banner.show{transform:translateX(-50%) translateY(0)}
+.update-banner span{font-size:14px;font-weight:600}
+.update-banner button{border:0;border-radius:999px;background:#fff;color:#4f46e5;font-weight:800;padding:9px 16px;cursor:pointer;white-space:nowrap}
+@media (max-width:640px){.update-banner{bottom:12px;padding:10px 12px;gap:8px}.update-banner span{font-size:13px}}
+
+/* ---------- samakan preview mobile = desktop ----------
+   Kertas A4 (210mm) diskalakan proporsional agar muat di layar kecil,
+   jadi layout preview di HP persis sama dengan di desktop & hasil print. */
+@media screen {
+  .paper-wrap.fit { overflow: hidden; }
+  .paper-wrap.fit > .paper { transform-origin: top left; }
+}
+@media print {
+  .paper-wrap { height: auto !important; overflow: visible !important; }
+  .paper-wrap > .paper { transform: none !important; }
+}
+
+/* ---------- bubble preview (intip CV tanpa pindah tab) ---------- */
+.bubble-preview {
+  position: fixed; right: 18px; bottom: 18px; z-index: 55;
+  width: 62px; height: 62px; border-radius: 50%;
+  background: var(--accent); color: #fff; font-size: 27px; line-height: 1;
+  border: 0; box-shadow: 0 12px 30px rgba(79,70,229,.45);
+  cursor: pointer; display: none; place-items: center;
+}
+.bubble-preview:active { transform: scale(.94); }
+@media (max-width: 1023px) {
+  body:not(.show-preview) .bubble-preview { display: grid; }
+}
+/* ---------- bottom sheet pratinjau ---------- */
+.sheet {
+  position: fixed; inset: 0; z-index: 70;
+  background: rgba(15,18,35,.55);
+  display: flex; align-items: flex-end; justify-content: center;
+}
+.sheet[hidden] { display: none; }
+.sheet-card {
+  background: var(--bg); width: 100%; max-width: 900px; max-height: 94vh;
+  border-radius: 20px 20px 0 0; padding: 10px 12px 18px;
+  overflow-y: auto; overscroll-behavior: contain;
+}
+.sheet-bar {
+  position: sticky; top: 0; z-index: 2;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 2px 10px; background: var(--bg);
+}
+@media print {
+  .bubble-preview, .sheet { display: none !important; }
 }
